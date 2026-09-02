@@ -69,7 +69,7 @@ async function generateOpxSeed() {
   return mnemonic;
 }
 
-function isValidOpxSeed(seed) {
+export function isValidOpxSeed(seed) {
   try {
     return moneroMnemonic.isValid(seed.trim().toLowerCase());
   } catch (_) {

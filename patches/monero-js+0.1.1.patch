@@ -1,0 +1,13 @@
+diff --git a/node_modules/monero-js/src/mnemonic.js b/node_modules/monero-js/src/mnemonic.js
+index 2bb55e4..d2ef0bc 100644
+--- a/node_modules/monero-js/src/mnemonic.js
++++ b/node_modules/monero-js/src/mnemonic.js
+@@ -70,7 +70,7 @@ function _encodeToList(entropy_bytes) {
+ 
+     const mnemonic_list = [];
+     for (let i = 0; i < entropy_bytes.length / 4; i++) {
+-        words = _bytesChunkToWords(entropy_bytes.slice(i * 4, (i * 4) + 4));
++        const words = _bytesChunkToWords(entropy_bytes.slice(i * 4, (i * 4) + 4));
+         mnemonic_list.push(...words);
+     }
+ 

@@ -13,6 +13,7 @@ import {
 } from '../services/storage';
 import { deriveTonHint } from '../services/ton';
 import { ethers } from 'ethers';
+import { opxCreateWallet, opxRestoreWallet, isValidOpxSeed } from '../services/rpc';
 
 /**
  * Детерминированный пароль OPX-кошелька из seed-фразы.
@@ -49,8 +50,13 @@ export async function createNewWallet() {
   await saveSettings(settings);
   await saveOpxCreds({ filename: opxFile, password: opxPassword });
 
+  // Non-custodial OPX-кошелёк: 25-словная Electrum-мнемоника + пароль
+  // генерируются на этом же устройстве и хранятся только в SecureStore
+  // (rpc.js). Сервер их не видит. Адрес нужен для майнинга и баланса.
+  const opx = await opxCreateWallet();
+
   await setOnboarded();
-  return { mnemonic, ethAddress: eth.address };
+  return { mnemonic, ethAddress: eth.address, opxAddress: opx.address, opxSeed: opx.seed };
 }
 
 export async function restoreFromMnemonic(mnemonic) {
@@ -69,6 +75,17 @@ export async function restoreFromMnemonic(mnemonic) {
     settings.opxWalletPassword = opxPassword;
     await saveSettings(settings);
     await saveOpxCreds({ filename: opxFile, password: opxPassword });
+  }
+
+  // Non-custodial OPX: восстановить по 25-словной Electrum-фразе.
+  // Проверка контрольной суммы выполняется в rpc.js (isValidOpxSeed)
+  // до передачи в native-слой. Если пользователь ввёл 12-словную
+  // BIP39-фразу ETH — это отдельный кошелёк, не трогаем его, а
+  // восстанавливаем только OPX по своей фразе.
+  if (isValidOpxSeed(phrase)) {
+    const opx = await opxRestoreWallet(phrase);
+    await setOnboarded();
+    return { ethAddress: eth.address, opxAddress: opx.address };
   }
 
   await setOnboarded();

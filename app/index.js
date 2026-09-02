@@ -30,8 +30,10 @@ export default function Onboarding() {
   const onCreate = async () => {
     setBusy(true);
     try {
-      const { mnemonic: m } = await createNewWallet();
-      setMnemonic(m);
+      // Показываем non-custodial OPX-фразу (25 слов) — она главная
+      // для майнинга/баланса. BIP39 (ETH/BTC/TON) скрыт, доступен в настройках.
+      const { opxSeed } = await createNewWallet();
+      setMnemonic(opxSeed);
       setMode('seed');
     } catch (e) {
       Alert.alert(t('error'), e.message);
