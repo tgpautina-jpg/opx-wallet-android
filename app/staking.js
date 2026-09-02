@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-nativ
 import { THEME, OPX } from '../src/config/network';
 import { t } from '../src/i18n';
 import { loadSettings } from '../src/services/storage';
-import { opxEnsureWallet, opxTransfer, toAtomic } from '../src/services/rpc';
+import { opxReopenWallet, opxTransfer } from '../src/services/rpc';
 
 const TERMS = [
   { months: 1, apy: OPX.stakingApy[1] },
@@ -32,10 +32,9 @@ export default function StakingScreen() {
     }
     setBusy(true);
     try {
-      const auth = settings.opxUser ? { user: settings.opxUser, pass: settings.opxPass } : null;
-      await opxEnsureWallet(settings.opxRpc, auth, settings.opxWalletFile, settings.opxWalletPassword);
-      const r = await opxTransfer(settings.opxRpc, auth, stakingAddr, toAtomic(amount));
-      Alert.alert('OK', `Staked ${amount} OPX for ${term.months}m @ ${term.apy}%\n${r.tx_hash || ''}`);
+      await opxReopenWallet();
+      const r = await opxTransfer(stakingAddr, amount);
+      Alert.alert('OK', `Staked ${amount} OPX for ${term.months}m @ ${term.apy}%\n${r.txid || ''}`);
       setAmount('');
     } catch (e) {
       Alert.alert(t('error'), e.message);

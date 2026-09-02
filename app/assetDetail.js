@@ -7,8 +7,8 @@ import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { THEME } from '../src/config/network';
 import { t } from '../src/i18n';
-import { loadSettings, loadEthKeys } from '../src/services/storage';
-import { opxEnsureWallet, opxTransfer, opxGetTransfers, toAtomic, fromAtomic } from '../src/services/rpc';
+import { loadEthKeys } from '../src/services/storage';
+import { opxReopenWallet, opxTransfer } from '../src/services/rpc';
 import { sendEth, sendErc20 } from '../src/services/eth';
 import { getBtcHistory } from '../src/services/btc';
 import { getTonHistory } from '../src/services/ton';
@@ -36,14 +36,9 @@ export default function AssetDetail() {
   const loadHistory = async () => {
     try {
       if (type === 'opx') {
-        const settings = await loadSettings();
-        const auth = settings.opxUser ? { user: settings.opxUser, pass: settings.opxPass } : null;
-        await opxEnsureWallet(settings.opxRpc, auth, settings.opxWalletFile, settings.opxWalletPassword);
-        const tr = await opxGetTransfers(settings.opxRpc, auth);
-        const items = [];
-        (tr.in || []).forEach((x) => items.push({ dir: 'in', amount: fromAtomic(x.amount), hash: x.txid || x.tx_hash }));
-        (tr.out || []).forEach((x) => items.push({ dir: 'out', amount: fromAtomic(x.amount), hash: x.txid || x.tx_hash }));
-        setHistory(items.slice(0, 30));
+        // История транзакций OPX пока недоступна в новом JNI-контракте
+        // (нет метода getTransfers) — оставляем пустой список.
+        setHistory([]);
       } else if (type === 'btc' && address) {
         setHistory(await getBtcHistory(address));
       } else if (type === 'ton' && address) {
@@ -64,11 +59,9 @@ export default function AssetDetail() {
     setBusy(true);
     try {
       if (type === 'opx') {
-        const settings = await loadSettings();
-        const auth = settings.opxUser ? { user: settings.opxUser, pass: settings.opxPass } : null;
-        await opxEnsureWallet(settings.opxRpc, auth, settings.opxWalletFile, settings.opxWalletPassword);
-        const r = await opxTransfer(settings.opxRpc, auth, to.trim(), toAtomic(amount));
-        Alert.alert('OK', r.tx_hash || 'sent');
+        await opxReopenWallet();
+        const r = await opxTransfer(to.trim(), amount);
+        Alert.alert('OK', r.txid || 'sent');
       } else if (type === 'evm') {
         const { privateKey } = await loadEthKeys();
         const hash = await sendEth(privateKey, to.trim(), amount);

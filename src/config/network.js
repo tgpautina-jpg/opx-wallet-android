@@ -21,10 +21,8 @@ export const OPX = {
   walletRpcPort: 28984,
   addressPrefix: 30,
   atomic: 1e12,
-  // Secure wallet-rpc via HTTPS proxy (Basic auth)
-  defaultWalletRpc: 'https://opxnetwork.duckdns.org/wallet-rpc/json_rpc',
-  rpcUser: 'opxrpc',
-  rpcPass: '6a253f297c1b9d88eb8f7c43320997c8',
+  // Non-custodial: local wallet-rpc on device loopback, no auth (Phase B bundles the binary).
+  defaultWalletRpc: 'http://127.0.0.1:28984/json_rpc',
   stakingAddress: '62FBkUpbDyCHEMbEnf2A74Xs2dkMbwogZeTKjbyAbb86JhCJqRtnQe17EbBo5eC5oSJJa8eJkmWFbgaucMmScuXkPjg9mta', // operator wallet (server wallet-rpc)
   stakingApy: { 1: 5, 3: 10, 6: 20 }
 };

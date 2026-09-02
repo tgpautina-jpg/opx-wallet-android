@@ -6,7 +6,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { THEME, BUILTIN_ASSETS } from '../src/config/network';
 import { t, initLang } from '../src/i18n';
 import { loadSettings, loadCustomAssets, loadEthKeys, loadBtcKeys, loadTonAddress } from '../src/services/storage';
-import { opxEnsureWallet, opxGetBalance, opxGetAddress, fromAtomic } from '../src/services/rpc';
+import { opxReopenWallet, opxGetBalance, opxGetAddress } from '../src/services/rpc';
 import { getEthBalance, getErc20Balance } from '../src/services/eth';
 import { getBtcBalance } from '../src/services/btc';
 import { getTonBalance } from '../src/services/ton';
@@ -40,19 +40,10 @@ export default function WalletHome() {
     let opxBal = 0;
     let opxAddr = '';
     try {
-      const auth = settings.opxUser ? { user: settings.opxUser, pass: settings.opxPass } : null;
-      if (settings.opxWalletFile && settings.opxWalletPassword) {
-        await opxEnsureWallet(
-          settings.opxRpc,
-          auth,
-          settings.opxWalletFile,
-          settings.opxWalletPassword
-        );
-        const b = await opxGetBalance(settings.opxRpc, auth);
-        opxBal = fromAtomic(b.balance);
-        const a = await opxGetAddress(settings.opxRpc, auth);
-        opxAddr = a.address || a.addresses?.[0]?.address || '';
-      }
+      await opxReopenWallet();
+      const b = await opxGetBalance();
+      opxBal = b.balance;
+      opxAddr = await opxGetAddress();
     } catch (e) {
       setErr('OPX: ' + e.message);
     }

@@ -89,23 +89,6 @@ export default function SettingsScreen() {
         placeholderTextColor={THEME.muted}
       />
 
-      <Text style={styles.label}>OPX RPC user</Text>
-      <TextInput
-        style={styles.input}
-        value={s.opxUser}
-        onChangeText={(v) => setS({ ...s, opxUser: v })}
-        autoCapitalize="none"
-        placeholderTextColor={THEME.muted}
-      />
-      <Text style={styles.label}>OPX RPC password</Text>
-      <TextInput
-        style={styles.input}
-        value={s.opxPass}
-        onChangeText={(v) => setS({ ...s, opxPass: v })}
-        secureTextEntry
-        placeholderTextColor={THEME.muted}
-      />
-
       <Text style={styles.label}>BTC address (watch / receive)</Text>
       <TextInput
         style={styles.input}

@@ -11,7 +11,6 @@ import {
   saveSettings,
   setOnboarded
 } from '../services/storage';
-import { opxEnsureWallet } from '../services/rpc';
 import { deriveTonHint } from '../services/ton';
 import { ethers } from 'ethers';
 
@@ -25,7 +24,7 @@ function deriveOpxPassword(mnemonic) {
 
 /**
  * Create local BIP39 wallet for EVM (+ linked BTC/TON metadata).
- * OPX: open/create on remote wallet-rpc with random local password.
+ * OPX: open/create on LOCAL (on-device) wallet-rpc with deterministic password.
  */
 export async function createNewWallet() {
   const mnemonic = createMnemonic(128);
@@ -50,14 +49,6 @@ export async function createNewWallet() {
   await saveSettings(settings);
   await saveOpxCreds({ filename: opxFile, password: opxPassword });
 
-  try {
-    const auth = settings.opxUser ? { user: settings.opxUser, pass: settings.opxPass } : null;
-    await opxEnsureWallet(settings.opxRpc, auth, opxFile, opxPassword);
-  } catch (e) {
-    // OPX node may be offline — wallet still created locally for EVM
-    console.warn('OPX ensure failed', e.message);
-  }
-
   await setOnboarded();
   return { mnemonic, ethAddress: eth.address };
 }
@@ -78,10 +69,6 @@ export async function restoreFromMnemonic(mnemonic) {
     settings.opxWalletPassword = opxPassword;
     await saveSettings(settings);
     await saveOpxCreds({ filename: opxFile, password: opxPassword });
-    try {
-      const auth = settings.opxUser ? { user: settings.opxUser, pass: settings.opxPass } : null;
-      await opxEnsureWallet(settings.opxRpc, auth, opxFile, opxPassword);
-    } catch (_) {}
   }
 
   await setOnboarded();

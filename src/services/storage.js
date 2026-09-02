@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { OPX } from '../config/network';
 
 const K = {
   onboarded: 'opx_onboarded',
@@ -28,9 +29,7 @@ export async function loadSettings() {
   if (!raw) {
     return {
       lang: 'ru',
-      opxRpc: 'https://opxnetwork.duckdns.org/wallet-rpc/json_rpc',
-      opxUser: 'opxrpc',
-      opxPass: '6a253f297c1b9d88eb8f7c43320997c8',
+      opxRpc: OPX.defaultWalletRpc,
       opxWalletFile: 'mobile_wallet',
       opxWalletPassword: '',
       showBalances: true
@@ -39,9 +38,7 @@ export async function loadSettings() {
   const s = JSON.parse(raw);
   return {
     ...s,
-    opxRpc: 'https://opxnetwork.duckdns.org/wallet-rpc/json_rpc',
-    opxUser: 'opxrpc',
-    opxPass: '6a253f297c1b9d88eb8f7c43320997c8'
+    opxRpc: s.opxRpc || OPX.defaultWalletRpc
   };
 }
 
