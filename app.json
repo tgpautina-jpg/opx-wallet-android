@@ -1,59 +1,38 @@
 {
   "expo": {
-    "name": "OPX Wallet",
-    "slug": "opx-wallet",
-    "version": "3.0.0",
+    "name": "OPX Cold Wallet",
+    "slug": "opx-wallet-mobile",
+    "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "opxwallet",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
-    "icon": "./assets/icon.png",
     "splash": {
-      "backgroundColor": "#0B1220",
-      "resizeMode": "contain"
+      "backgroundColor": "#0B1220"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "org.opx.wallet",
+      "bundleIdentifier": "org.opx.coldwallet",
       "infoPlist": {
         "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true,
           "NSAllowsLocalNetworking": true
         }
       }
     },
     "android": {
-      "package": "org.opx.wallet",
-      "versionCode": 3,
+      "package": "org.opx.coldwallet",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B1220"
       },
-      "permissions": [
-        "INTERNET",
-        "ACCESS_NETWORK_STATE"
-      ]
+      "permissions": []
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "usesCleartextTraffic": true,
-            "minSdkVersion": 28
-          }
-        }
-      ],
       "expo-asset"
     ],
     "extra": {
-      "router": {
-        "origin": false
-      },
       "eas": {
-        "projectId": "4cc07e23-493b-4858-b9c3-969ba8386d8b"
+        "projectId": "replace-with-your-eas-project-id"
       }
     }
   }

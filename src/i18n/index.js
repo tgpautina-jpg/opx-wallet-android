@@ -1,111 +1,85 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const D = {
+const dict = {
   en: {
-    app_name: 'OPX Wallet',
-    create_wallet: 'Create wallet',
-    restore_wallet: 'Restore from seed',
+    choose_lang: 'Choose language',
     continue: 'Continue',
-    seed_title: 'Save your OPX seed phrase',
-    seed_warn: 'Write these 25 words down offline. It is your non-custodial OPX wallet (key stays on this device). Anyone with this phrase controls your OPX funds and mining rewards. The ETH/USDT/BTC/TON phrase is in Settings.',
-    seed_confirm: 'I saved the seed phrase',
-    home: 'Home',
-    assets: 'Assets',
-    staking: 'Staking',
+    wallet: 'Wallet',
     settings: 'Settings',
-    total_balance: 'Total balance',
+    balance: 'Balance',
     receive: 'Receive',
     send: 'Send',
     history: 'History',
-    copy: 'Copy',
-    copied: 'Copied',
-    amount: 'Amount',
     address: 'Address',
-    to: 'Recipient',
-    confirm: 'Confirm',
-    add_token: 'Add ERC-20 token',
-    contract: 'Contract address',
+    copy: 'Copy',
+    amount: 'Amount (OPX)',
+    dest: 'Destination',
+    node: 'Remote node (optional)',
+    node_hint: 'Keys never leave this device in production cold mode. Remote node is only for broadcast/sync when you enable it.',
     save: 'Save',
-    language: 'Language',
-    opx_node: 'OPX wallet-rpc URL',
-    view_seed: 'View seed phrase',
-    logout: 'Reset wallet',
-    staking_title: 'OPX Staking',
-    months: 'Months',
-    apy: 'APY',
-    stake: 'Stake',
-    loading: 'Loading…',
-    error: 'Error',
-    no_history: 'No transactions yet',
-    pin_title: 'Set PIN',
-    pin_enter: 'Enter PIN',
-    unlock: 'Unlock',
+    offline: 'Offline mode',
+    create: 'Create wallet (seed)',
+    restore: 'Restore from seed',
+    seed: 'Seed phrase',
+    password: 'Local password',
+    mvp_notice: 'MVP: crypto signing uses wallet-rpc / native OPX module. monero-ts must be rebuilt against OPX sources for true on-device spend keys.',
+    no_tx: 'No transactions',
+    refresh: 'Refresh',
     exchange: 'Exchange',
-    back: 'Back',
-    updated: 'Updated'
+    exchange_hint: 'Buy or sell OPX',
+    exchange_coming_soon: 'Exchange is coming soon!',
+    fill_fields: 'Please fill in all fields',
+    disclaimer: 'MVP cold wallet UI for OPX Network. No security guarantees.'
   },
   ru: {
-    app_name: 'OPX Wallet',
-    create_wallet: 'Создать кошелёк',
-    restore_wallet: 'Восстановить из seed',
+    choose_lang: 'Выберите язык',
     continue: 'Продолжить',
-    seed_title: 'Сохраните OPX seed-фразу',
-    seed_warn: 'Запишите эти 25 слов офлайн. Это ваш non-custodial OPX-кошелёк (ключ только на этом устройстве). Кто знает фразу — контролирует ваши OPX и награды за майнинг. Фраза ETH/USDT/BTC/TON — в настройках.',
-    seed_confirm: 'Я сохранил seed-фразу',
-    home: 'Главная',
-    assets: 'Активы',
-    staking: 'Стейкинг',
+    wallet: 'Кошелёк',
     settings: 'Настройки',
-    total_balance: 'Общий баланс',
+    balance: 'Баланс',
     receive: 'Получить',
     send: 'Отправить',
     history: 'История',
-    copy: 'Копировать',
-    copied: 'Скопировано',
-    amount: 'Сумма',
     address: 'Адрес',
-    to: 'Получатель',
-    confirm: 'Подтвердить',
-    add_token: 'Добавить ERC-20',
-    contract: 'Адрес контракта',
+    copy: 'Копировать',
+    amount: 'Сумма (OPX)',
+    dest: 'Адрес получателя',
+    node: 'Удалённый узел (опционально)',
+    node_hint: 'Ключи не должны покидать устройство. Удалённый узел — только для синка/отправки, если вы включили.',
     save: 'Сохранить',
-    language: 'Язык',
-    opx_node: 'URL OPX wallet-rpc',
-    view_seed: 'Показать seed',
-    logout: 'Сбросить кошелёк',
-    staking_title: 'Стейкинг OPX',
-    months: 'Месяцев',
-    apy: 'APY',
-    stake: 'Застейкать',
-    loading: 'Загрузка…',
-    error: 'Ошибка',
-    no_history: 'Пока нет транзакций',
-    pin_title: 'Установите PIN',
-    pin_enter: 'Введите PIN',
-    unlock: 'Разблокировать',
+    offline: 'Офлайн-режим',
+    create: 'Создать кошелёк (seed)',
+    restore: 'Восстановить из seed',
+    seed: 'Seed-фраза',
+    password: 'Локальный пароль',
+    mvp_notice: 'MVP: подпись через wallet-rpc / нативный модуль OPX. Для spend-ключей на устройстве monero-ts нужно собрать из исходников OPX.',
+    no_tx: 'Нет транзакций',
+    refresh: 'Обновить',
     exchange: 'Обменник',
-    back: 'Назад',
-    updated: 'Обновлено'
+    exchange_hint: 'Купить или продать OPX',
+    exchange_coming_soon: 'Обменник скоро будет!',
+    fill_fields: 'Заполните все поля',
+    disclaimer: 'MVP холодного кошелька OPX Network. Без гарантий безопасности.'
   }
 };
 
-let lang = 'ru';
+let lang = 'en';
 
-export async function initLang() {
-  const v = await AsyncStorage.getItem('opx_lang_v3');
+export async function loadLang() {
+  const v = await AsyncStorage.getItem('opx_lang');
   if (v) lang = v;
   return lang;
 }
 
 export async function setLang(l) {
   lang = l;
-  await AsyncStorage.setItem('opx_lang_v3', l);
+  await AsyncStorage.setItem('opx_lang', l);
+}
+
+export function t(key) {
+  return (dict[lang] && dict[lang][key]) || dict.en[key] || key;
 }
 
 export function getLang() {
   return lang;
-}
-
-export function t(key) {
-  return D[lang]?.[key] || D.en[key] || key;
 }

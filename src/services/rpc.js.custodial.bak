@@ -1,0 +1,85 @@
+import { OPX } from '../config/network';
+
+/**
+ * OPX wallet-rpc JSON-RPC client — NON-CUSTODIAL.
+ * The wallet-rpc runs locally on the device (127.0.0.1:28984) with
+ * --disable-rpc-login, so there is no auth header and no shared credentials.
+ * Spend keys never leave the device. (Phase B bundles the native binary.)
+ */
+export async function opxRpc(url, method, params = {}) {
+  if (!url) throw new Error('OPX RPC URL not set');
+
+  const headers = { 'Content-Type': 'application/json' };
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ jsonrpc: '2.0', id: '0', method, params })
+    });
+  } catch (e) {
+    throw new Error('Cannot reach OPX node: ' + (e.message || 'network error'));
+  }
+
+  const data = await res.json();
+  if (data.error) {
+    throw new Error(data.error.message || JSON.stringify(data.error));
+  }
+  return data.result;
+}
+
+export function toAtomic(opxAmount) {
+  return Math.round(parseFloat(opxAmount) * OPX.atomic);
+}
+
+export function fromAtomic(atomic) {
+  if (atomic == null) return 0;
+  return Number(atomic) / OPX.atomic;
+}
+
+export async function opxOpenWallet(url, filename, password) {
+  return opxRpc(url, 'open_wallet', { filename, password });
+}
+
+export async function opxCreateWallet(url, filename, password, language = 'English') {
+  return opxRpc(url, 'create_wallet', { filename, password, language });
+}
+
+export async function opxGetBalance(url) {
+  return opxRpc(url, 'get_balance', {});
+}
+
+export async function opxGetAddress(url) {
+  return opxRpc(url, 'get_address', {});
+}
+
+export async function opxTransfer(url, address, amountAtomic, priority = 0) {
+  return opxRpc(
+    url,
+    'transfer',
+    {
+      destinations: [{ amount: amountAtomic, address }],
+      priority,
+      ring_size: 3, // OPX: mixin 2 (ring size 3) — matches wallet2::get_min_ring_size()
+      get_tx_key: true
+    }
+  );
+}
+
+export async function opxGetTransfers(url) {
+  return opxRpc(url, 'get_transfers', { in: true, out: true, pending: true });
+}
+
+export async function opxEnsureWallet(url, filename, password) {
+  try {
+    await opxOpenWallet(url, filename, password);
+  } catch (_) {
+    try {
+      await opxCreateWallet(url, filename, password);
+    } catch (e2) {
+      // maybe already exists with different state
+      await opxOpenWallet(url, filename, password);
+    }
+  }
+}

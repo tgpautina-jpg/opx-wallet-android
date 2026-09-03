@@ -1,233 +1,259 @@
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, ActivityIndicator
+  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert, RefreshControl, Linking
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { THEME, BUILTIN_ASSETS } from '../src/config/network';
-import { t, initLang } from '../src/i18n';
-import { loadSettings, loadCustomAssets, loadEthKeys, loadBtcKeys, loadTonAddress } from '../src/services/storage';
-import { opxReopenWallet, opxGetBalance, opxGetAddress } from '../src/services/rpc';
-import { getEthBalance, getErc20Balance } from '../src/services/eth';
-import { getBtcBalance } from '../src/services/btc';
-import { getTonBalance } from '../src/services/ton';
-import { fetchPrices, usdValue } from '../src/services/coingecko';
+import * as Clipboard from 'expo-clipboard';
+import QRCode from 'react-native-qrcode-svg';
+import { THEME, OPX_NETWORK } from '../src/config/network';
+import { t, loadLang } from '../src/i18n';
+import { loadSettings, saveWalletMeta, loadWalletMeta } from '../src/services/storage';
+import {
+  getBalance, getAddress, getTransfers, transfer,
+  fromAtomic, toAtomic
+} from '../src/services/rpc';
 
-const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
-
-export default function WalletHome() {
+export default function WalletScreen() {
   const router = useRouter();
-  const [rows, setRows] = useState([]);
-  const [totalUsd, setTotalUsd] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const [address, setAddress] = useState('');
+  const [history, setHistory] = useState([]);
+  const [dest, setDest] = useState('');
+  const [amount, setAmount] = useState('');
+  const [status, setStatus] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [err, setErr] = useState('');
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const loadRef = useRef(null);
 
-  const load = async () => {
-    setErr('');
-    await initLang();
-    const settings = await loadSettings();
-    const custom = await loadCustomAssets();
-    const ethKeys = await loadEthKeys();
-    const btcKeys = await loadBtcKeys();
-    const tonAddr = await loadTonAddress();
-    const assets = [...BUILTIN_ASSETS, ...custom];
-
-    const priceIds = assets.map((a) => a.coingeckoId).filter(Boolean);
-    const prices = await fetchPrices(priceIds);
-
-    let opxBal = 0;
-    let opxAddr = '';
+  const refresh = async () => {
+    const s = await loadSettings();
+    setSettings(s);
+    await loadLang();
+    if (!s.walletRpcUrl || s.offlineOnly) {
+      setStatus(t('offline'));
+      const meta = await loadWalletMeta();
+      if (meta?.address) setAddress(meta.address);
+      return;
+    }
     try {
-      await opxReopenWallet();
-      const b = await opxGetBalance();
-      opxBal = b.balance;
-      opxAddr = await opxGetAddress();
+      const bal = await getBalance(s.walletRpcUrl);
+      setBalance(bal);
+      const addr = await getAddress(s.walletRpcUrl);
+      const ad = addr.address || addr.addresses?.[0]?.address || '';
+      setAddress(ad);
+      await saveWalletMeta({ address: ad, updated: Date.now() });
+      const tr = await getTransfers(s.walletRpcUrl);
+      const items = [];
+      (tr.in || []).forEach(x => items.push({ ...x, dir: 'in' }));
+      (tr.out || []).forEach(x => items.push({ ...x, dir: 'out' }));
+      items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      setHistory(items.slice(0, 30));
+      setStatus('OK');
     } catch (e) {
-      setErr('OPX: ' + e.message);
+      setStatus(e.message);
     }
-
-    const out = [];
-    let usdSum = 0;
-
-    for (const asset of assets) {
-      let balance = '0';
-      let address = '';
-      try {
-        if (asset.type === 'opx') {
-          balance = String(opxBal);
-          address = opxAddr;
-        } else if (asset.type === 'evm' && ethKeys.address) {
-          balance = await getEthBalance(ethKeys.address);
-          address = ethKeys.address;
-        } else if (asset.type === 'erc20' && ethKeys.address && asset.contract) {
-          balance = await getErc20Balance(ethKeys.address, asset.contract);
-          address = ethKeys.address;
-        } else if (asset.type === 'btc') {
-          address = btcKeys.address || '';
-          if (address) balance = await getBtcBalance(address);
-        } else if (asset.type === 'ton') {
-          address = tonAddr || '';
-          if (address && address.startsWith('EQ')) {
-            try {
-              balance = await getTonBalance(address);
-            } catch {
-              balance = '0';
-            }
-          }
-        }
-      } catch (e) {
-        balance = '—';
-      }
-
-      const num = parseFloat(balance) || 0;
-      const usd = usdValue(num, asset.coingeckoId, prices);
-      // OPX fixed $1 — never fetched from external APIs
-      const usdFinal = asset.id === 'opx' ? num * 1 : usd;
-      usdSum += usdFinal;
-
-      out.push({
-        ...asset,
-        balance,
-        address,
-        usd: usdFinal
-      });
-    }
-
-    setRows(out);
-    setTotalUsd(usdSum);
-    setLastUpdate(new Date());
-    setLoading(false);
   };
-
-  loadRef.current = load;
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      refresh();
     }, [])
   );
 
-  // Auto-refresh prices & balances every 5 minutes
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (loadRef.current) loadRef.current();
-    }, AUTO_REFRESH_MS);
-    return () => clearInterval(id);
-  }, []);
-
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
+    await refresh();
     setRefreshing(false);
+  };
+
+  const doSend = async () => {
+    if (!dest.trim() || !amount.trim()) {
+      Alert.alert('Error', t('fill_fields'));
+      return;
+    }
+    try {
+      const atomic = toAtomic(amount);
+      await transfer(settings.walletRpcUrl, [{ address: dest.trim(), amount: atomic }]);
+      setDest('');
+      setAmount('');
+      Alert.alert('OK', 'Sent');
+      await refresh();
+    } catch (e) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const copyAddr = async () => {
+    if (address) {
+      await Clipboard.setStringAsync(address);
+      Alert.alert('OK', t('copy'));
+    }
+  };
+
+  const openExchange = () => {
+    if (OPX_NETWORK.exchangeUrl) {
+      Linking.openURL(OPX_NETWORK.exchangeUrl);
+    } else {
+      Alert.alert(t('exchange'), t('exchange_coming_soon'));
+    }
   };
 
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.accent} />
-      }
+      contentContainerStyle={{ padding: 16 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.accent} />}
     >
-      <View style={styles.header}>
-        <Text style={styles.brand}>OPX Wallet</Text>
-        <View style={styles.nav}>
-          <Pressable onPress={() => router.push('/assets')}>
-            <Text style={styles.navLink}>{t('assets')}</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/staking')}>
-            <Text style={styles.navLink}>{t('staking')}</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/exchange')}>
-            <Text style={[styles.navLink, styles.navAccent]}>{t('exchange')}</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/settings')}>
-            <Text style={styles.navLink}>{t('settings')}</Text>
-          </Pressable>
-        </View>
+      <View style={styles.row}>
+        <Text style={styles.title}>OPX</Text>
+        <Pressable onPress={() => router.push('/settings')}>
+          <Text style={styles.link}>{t('settings')}</Text>
+        </Pressable>
       </View>
 
-      <View style={styles.totalCard}>
-        <Text style={styles.totalLabel}>{t('total_balance')}</Text>
-        {loading ? (
-          <ActivityIndicator color={THEME.accent} />
-        ) : (
-          <Text style={styles.totalValue}>${totalUsd.toFixed(2)}</Text>
-        )}
-        {lastUpdate && (
-          <Text style={styles.updated}>
-            {t('updated')}: {lastUpdate.toLocaleTimeString()}
+      <Text style={styles.muted}>{status}</Text>
+
+      {/* Balance */}
+      <View style={styles.card}>
+        <Text style={styles.label}>{t('balance')}</Text>
+        <Text style={styles.balance}>
+          {balance ? `${fromAtomic(balance.balance).toFixed(4)} OPX` : '—'}
+        </Text>
+        {balance && (
+          <Text style={styles.muted}>
+            unlocked: {fromAtomic(balance.unlocked_balance).toFixed(4)}
           </Text>
         )}
-        {!!err && <Text style={styles.err}>{err}</Text>}
       </View>
 
-      {rows.map((a) => (
-        <Pressable
-          key={a.id}
-          style={styles.assetRow}
-          onPress={() =>
-            router.push({
-              pathname: '/assetDetail',
-              params: {
-                id: a.id,
-                symbol: a.symbol,
-                type: a.type,
-                contract: a.contract || '',
-                decimals: String(a.decimals || 18),
-                balance: a.balance,
-                address: a.address || ''
-              }
-            })
-          }
-        >
-          <View>
-            <Text style={styles.sym}>{a.symbol}</Text>
-            <Text style={styles.name}>{a.name}</Text>
+      {/* Exchange button */}
+      <Pressable style={styles.exchangeCard} onPress={openExchange}>
+        <Text style={styles.exchangeIcon}>⇄</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.exchangeTitle}>{t('exchange')}</Text>
+          <Text style={styles.exchangeHint}>{t('exchange_hint')}</Text>
+        </View>
+        <Text style={styles.exchangeArrow}>›</Text>
+      </Pressable>
+
+      {/* Receive */}
+      <View style={styles.card}>
+        <Text style={styles.label}>{t('receive')}</Text>
+        <Text selectable style={styles.address}>{address || '—'}</Text>
+        {!!address && (
+          <View style={{ alignItems: 'center', marginVertical: 12, backgroundColor: '#fff', padding: 12, borderRadius: 8 }}>
+            <QRCode value={address} size={160} backgroundColor="#fff" color="#000" />
           </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.bal}>{a.balance === '—' ? '—' : Number(a.balance).toFixed(2)}</Text>
-            <Text style={styles.usd}>${(a.usd || 0).toFixed(2)}</Text>
-          </View>
+        )}
+        <Pressable style={styles.btnGhost} onPress={copyAddr}>
+          <Text style={styles.btnGhostText}>{t('copy')}</Text>
         </Pressable>
-      ))}
+      </View>
+
+      {/* Send */}
+      <View style={styles.card}>
+        <Text style={styles.label}>{t('send')}</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={t('dest')}
+          placeholderTextColor={THEME.muted}
+          value={dest}
+          onChangeText={setDest}
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder={t('amount')}
+          placeholderTextColor={THEME.muted}
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="decimal-pad"
+        />
+        <Pressable style={styles.btn} onPress={doSend}>
+          <Text style={styles.btnText}>{t('send')}</Text>
+        </Pressable>
+      </View>
+
+      {/* History */}
+      <View style={styles.card}>
+        <Text style={styles.label}>{t('history')}</Text>
+        {history.length === 0 ? (
+          <Text style={styles.muted}>{t('no_tx')}</Text>
+        ) : (
+          history.map((tx, i) => (
+            <View key={i} style={styles.tx}>
+              <Text style={{ color: tx.dir === 'in' ? THEME.accent : '#f59e0b' }}>
+                {tx.dir === 'in' ? '+' : '−'}{fromAtomic(tx.amount).toFixed(4)} OPX
+              </Text>
+              <Text style={styles.muted}>
+                {(tx.txid || tx.tx_hash || '').slice(0, 14)}…
+              </Text>
+            </View>
+          ))
+        )}
+      </View>
+
+      <Text style={[styles.muted, { marginBottom: 40 }]}>
+        {OPX_NETWORK.name} · prefix {OPX_NETWORK.addressPrefix}
+      </Text>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: THEME.bg },
-  header: { marginBottom: 16 },
-  brand: { fontSize: 24, fontWeight: '900', color: THEME.accent },
-  nav: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 8 },
-  navLink: { color: THEME.muted, fontWeight: '600' },
-  navAccent: { color: THEME.accent },
-  totalCard: {
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  title: { fontSize: 28, fontWeight: '800', color: THEME.accent },
+  link: { color: THEME.accent, fontWeight: '600' },
+  muted: { color: THEME.muted, fontSize: 12 },
+  card: {
     backgroundColor: THEME.card,
-    borderRadius: 16,
-    borderWidth: 1,
     borderColor: THEME.border,
-    padding: 20,
-    marginBottom: 16
-  },
-  totalLabel: { color: THEME.muted, fontSize: 12, textTransform: 'uppercase' },
-  totalValue: { color: THEME.accent, fontSize: 32, fontWeight: '800', marginTop: 4 },
-  updated: { color: THEME.muted, fontSize: 11, marginTop: 6 },
-  err: { color: THEME.danger, fontSize: 12, marginTop: 8 },
-  assetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: THEME.card,
+    borderWidth: 1,
     borderRadius: 12,
-    borderWidth: 1,
+    padding: 16,
+    marginBottom: 12
+  },
+  label: { color: THEME.muted, fontSize: 12, textTransform: 'uppercase', marginBottom: 8 },
+  balance: { color: THEME.accent, fontSize: 28, fontWeight: '700' },
+  address: { color: THEME.text, fontSize: 12, fontFamily: 'monospace' },
+  input: {
+    backgroundColor: THEME.input,
     borderColor: THEME.border,
-    padding: 14,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    color: THEME.text,
     marginBottom: 10
   },
-  sym: { color: THEME.text, fontWeight: '700', fontSize: 16 },
-  name: { color: THEME.muted, fontSize: 12 },
-  bal: { color: THEME.text, fontWeight: '600' },
-  usd: { color: THEME.muted, fontSize: 12 }
+  btn: {
+    backgroundColor: THEME.accent,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center'
+  },
+  btnText: { color: '#022c22', fontWeight: '700' },
+  btnGhost: {
+    borderColor: THEME.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center'
+  },
+  btnGhostText: { color: THEME.muted, fontWeight: '600' },
+  tx: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: THEME.border },
+  // Exchange card
+  exchangeCard: {
+    backgroundColor: THEME.card,
+    borderColor: THEME.accent,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  exchangeIcon: { fontSize: 28, color: THEME.accent, marginRight: 12 },
+  exchangeTitle: { color: THEME.text, fontSize: 16, fontWeight: '700' },
+  exchangeHint: { color: THEME.muted, fontSize: 12, marginTop: 2 },
+  exchangeArrow: { color: THEME.muted, fontSize: 24 }
 });
